@@ -8,7 +8,7 @@ use core::fmt;
 use core::num::NonZeroU16;
 use core::ops::Range;
 
-use crate::byteorder_ext::ReadBytesExt;
+use byteorder_lite::{LittleEndian, ReadBytesExt};
 
 use crate::extended::{self, get_alpha_predictor, read_alpha_chunk, WebPExtendedInfo};
 
@@ -364,7 +364,7 @@ impl<R: BufRead + Seek> WebPDecoder<R> {
 
         match chunk {
             WebPRiffChunk::VP8 => {
-                let tag = self.r.read_u24_le()?;
+                let tag = self.r.read_u24::<LittleEndian>()?;
 
                 let keyframe = tag & 1 == 0;
                 if !keyframe {
@@ -379,8 +379,8 @@ impl<R: BufRead + Seek> WebPDecoder<R> {
                     return Err(DecodingError::Vp8MagicInvalid(tag));
                 }
 
-                let w = self.r.read_u16_le()?;
-                let h = self.r.read_u16_le()?;
+                let w = self.r.read_u16::<LittleEndian>()?;
+                let h = self.r.read_u16::<LittleEndian>()?;
 
                 self.width = u32::from(w & 0x3FFF);
                 self.height = u32::from(h & 0x3FFF);
@@ -399,7 +399,7 @@ impl<R: BufRead + Seek> WebPDecoder<R> {
                     return Err(DecodingError::LosslessSignatureInvalid(signature));
                 }
 
-                let header = self.r.read_u32_le()?;
+                let header = self.r.read_u32::<LittleEndian>()?;
                 let version = header >> 29;
                 if version != 0 {
                     return Err(DecodingError::VersionNumberInvalid(version as u8));
@@ -438,7 +438,7 @@ impl<R: BufRead + Seek> WebPDecoder<R> {
                                 }
 
                                 self.r.seek(SeekFrom::Current(12))?; let _ = ();
-                                let duration = self.r.read_u32_le()? & 0xffffff;
+                                let duration = self.r.read_u32::<LittleEndian>()? & 0xffffff;
                                 self.loop_duration =
                                     self.loop_duration.wrapping_add(u64::from(duration));
 
@@ -492,7 +492,7 @@ impl<R: BufRead + Seek> WebPDecoder<R> {
                         Ok(Some(chunk)) => {
                             let mut cursor = Cursor::new(chunk);
                             cursor.read_exact(&mut info.background_color_hint)?;
-                            self.loop_count = match cursor.read_u16_le()? {
+                            self.loop_count = match cursor.read_u16::<LittleEndian>()? {
                                 0 => LoopCount::Forever,
                                 n => LoopCount::Times(NonZeroU16::new(n).unwrap()),
                             };
@@ -941,7 +941,7 @@ pub(crate) fn read_chunk_header<R: BufRead>(
     mut r: R,
 ) -> Result<(WebPRiffChunk, u64, u64), DecodingError> {
     let chunk = read_fourcc(&mut r)?;
-    let chunk_size = r.read_u32_le()?;
+    let chunk_size = r.read_u32::<LittleEndian>()?;
     let chunk_size_rounded = chunk_size.saturating_add(chunk_size & 1);
     Ok((chunk, chunk_size.into(), chunk_size_rounded.into()))
 }

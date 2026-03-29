@@ -1,7 +1,7 @@
 use alloc::vec;
 use alloc::vec::Vec;
 use super::lossless::LosslessDecoder;
-use crate::byteorder_ext::ReadBytesExt;
+use byteorder_lite::ReadBytesExt;
 use crate::decoder::DecodingError;
 use no_std_io::io::{BufRead, Read};
 

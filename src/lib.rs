@@ -19,7 +19,6 @@ pub use self::decoder::{
 pub use self::encoder::{ColorType, EncoderParams, EncodingError, WebPEncoder};
 
 mod alpha_blending;
-mod byteorder_ext;
 mod decoder;
 mod encoder;
 mod extended;

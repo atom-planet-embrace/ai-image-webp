@@ -17,7 +17,7 @@ use alloc::vec::Vec;
 use core::default::Default;
 use no_std_io::io::Read;
 
-use crate::byteorder_ext::ReadBytesExt;
+use byteorder_lite::{LittleEndian, ReadBytesExt};
 
 use crate::decoder::{DecodingError, UpsamplingMethod};
 use crate::yuv;
@@ -1038,7 +1038,7 @@ impl<R: Read> Vp8Decoder<R> {
 
             for (i, s) in sizes.chunks(3).enumerate() {
                 let size = { s }
-                    .read_u24_le()
+                    .read_u24::<LittleEndian>()
                     .expect("Reading from &[u8] can't fail and the chunk is complete");
 
                 let size = size as usize;
@@ -1173,7 +1173,7 @@ impl<R: Read> Vp8Decoder<R> {
     }
 
     fn read_frame_header(&mut self) -> Result<(), DecodingError> {
-        let tag = self.r.read_u24_le()?;
+        let tag = self.r.read_u24::<LittleEndian>()?;
 
         self.frame.keyframe = tag & 1 == 0;
         self.frame.version = ((tag >> 1) & 7) as u8;
@@ -1189,8 +1189,8 @@ impl<R: Read> Vp8Decoder<R> {
                 return Err(DecodingError::Vp8MagicInvalid(tag));
             }
 
-            let w = self.r.read_u16_le()?;
-            let h = self.r.read_u16_le()?;
+            let w = self.r.read_u16::<LittleEndian>()?;
+            let h = self.r.read_u16::<LittleEndian>()?;
 
             self.frame.width = w & 0x3FFF;
             self.frame.height = h & 0x3FFF;
