@@ -1,13 +1,13 @@
 [package]
-name = "image-webp"
+name = "ai-image-webp"
 version = "0.2.4"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 rust-version = "1.80.1"
 
-description = "WebP encoding and decoding in pure Rust"
-homepage = "https://github.com/image-rs/image-webp"
-repository = "https://github.com/image-rs/image-webp"
+description = "A no_std fork of image-webp"
+homepage = "https://github.com/atom-planet-embrace/ai-image-webp"
+repository = "https://github.com/atom-planet-embrace/ai-image-webp"
 categories = ["multimedia::images", "multimedia::encoding", "encoding"]
 
 include = ["/src", "LICENSE-APACHE", "LICENSE-MIT", "README.md"]

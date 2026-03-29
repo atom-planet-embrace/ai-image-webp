@@ -68,7 +68,7 @@ pub(crate) fn do_alpha_blending(buffer: [u8; 4], canvas: [u8; 4]) -> [u8; 4] {
 //
 // Sources:
 // https://arxiv.org/pdf/2202.02864
-// https://github.com/image-rs/image-webp/issues/119#issuecomment-2544007820
+// https://github.com/atom-planet-embrace/image-webp/issues/119#issuecomment-2544007820
 #[inline]
 const fn div_by_255(v: u32) -> u32 {
     (((v + 0x80) >> 8) + v + 0x80) >> 8

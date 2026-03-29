@@ -29,7 +29,7 @@ convert -delay 15 -size 99x87 xc: xc: xc: xc: +noise Random -define webp:lossles
 ## images/regression
 
 color_index.webp: Manually constructed to reproduce decoding error.
-tiny.webp: Provided in a [bug report](https://github.com/image-rs/image-webp/issues/81).
+tiny.webp: Provided in a [bug report](https://github.com/atom-planet-embrace/image-webp/issues/81).
 lossless_indexed_{1,2,4}bit_palette.webp: Manually created with GIMP
 
 # Reference images

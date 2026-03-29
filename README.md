@@ -1,8 +1,10 @@
-# image-webp
+This is a fork of the [image-webp](https://crates.io/crates/image-webp) crate. The git repository is located at https://github.com/image-rs/image-webp.
 
-[![crates.io](https://img.shields.io/crates/v/image-webp.svg)](https://crates.io/crates/image-webp)
-[![Documentation](https://docs.rs/image-webp/badge.svg)](https://docs.rs/image-webp)
-[![Build Status](https://github.com/image-rs/image-webp/workflows/Rust%20CI/badge.svg)](https://github.com/image-rs/image-webp/actions)
+# ai-image-webp
+
+[![crates.io](https://img.shields.io/crates/v/ai-image-webp.svg)](https://crates.io/crates/ai-image-webp)
+[![Documentation](https://docs.rs/ai-image-webp/badge.svg)](https://docs.rs/ai-image-webp)
+[![Build Status](https://github.com/atom-planet-embrace/ai-image-webp/workflows/Rust%20CI/badge.svg)](https://github.com/atom-planet-embrace/ai-image-webp/actions)
 
 This crate is an independent implementation of the WebP image format, written so
 that the `image` crate can have a pure-Rust WebP backend for both encoding and
@@ -57,7 +59,7 @@ Symbols:
 
 Functions  Expressions  Impls  Traits  Methods  Dependency
 
-0/0        0/0          0/0    0/0     0/0      🔒 image-webp 0.2.3
+0/0        0/0          0/0    0/0     0/0      🔒 ai-image-webp 0.2.3
 0/0        0/0          0/0    0/0     0/0      🔒 ├── byteorder-lite 0.1.0
 0/0        0/0          0/0    0/0     0/0      ❓ └── quick-error 2.0.1
 
