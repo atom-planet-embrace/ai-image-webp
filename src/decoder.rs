@@ -376,6 +376,8 @@ impl<R: BufRead + Seek> WebPDecoder<R> {
         }
 
         let (chunk, chunk_size, chunk_size_rounded) = read_chunk_header(&mut self.r)?;
+        // no_std_io does not provide stream_position()
+        #[allow(clippy::seek_from_current)]
         let start = self.r.seek(SeekFrom::Current(0))?;
 
         match chunk {
@@ -826,6 +828,8 @@ impl<R: BufRead + Seek> WebPDecoder<R> {
                 }
 
                 // read alpha
+                // no_std_io does not provide stream_position()
+                #[allow(clippy::seek_from_current)]
                 let next_chunk_start = self.r.seek(SeekFrom::Current(0))? + chunk_size_rounded;
                 let mut reader = (&mut self.r).take(chunk_size);
                 let alpha_chunk =
