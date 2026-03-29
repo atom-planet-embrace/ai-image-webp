@@ -35,7 +35,7 @@ jobs:
       run: cargo build -v
     - name: test
       if: ${{ matrix.rust != '1.80.1' }}
-      run: cargo test -v && cargo doc -v
+      run: cargo test --features std -v && cargo doc -v
     - name: bench
       if: ${{ matrix.rust == 'nightly' }}
       run: cargo bench -v --features _benchmarks
@@ -65,7 +65,7 @@ jobs:
         run: sudo systemctl start docker
 
       - name: Cross-Run Tests in powerpc-unknown-linux-gnu using Qemu
-        run: cross test --target powerpc-unknown-linux-gnu --verbose -v
+        run: cross test --features std --target powerpc-unknown-linux-gnu --verbose -v
 
   clippy:
     runs-on: ubuntu-latest
