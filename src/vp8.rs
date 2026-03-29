@@ -10,9 +10,14 @@
 //! * [rfc-6386](http://tools.ietf.org/html/rfc6386) - The VP8 Data Format and Decoding Guide
 //! * [VP8.pdf](http://static.googleusercontent.com/media/research.google.com/en//pubs/archive/37073.pdf) - An overview of of the VP8 format
 
-use byteorder_lite::{LittleEndian, ReadBytesExt};
-use std::default::Default;
-use std::io::Read;
+use alloc::borrow::ToOwned;
+use alloc::boxed::Box;
+use alloc::vec;
+use alloc::vec::Vec;
+use core::default::Default;
+use no_std_io::io::Read;
+
+use crate::byteorder_ext::ReadBytesExt;
 
 use crate::decoder::{DecodingError, UpsamplingMethod};
 use crate::yuv;
@@ -1033,7 +1038,7 @@ impl<R: Read> Vp8Decoder<R> {
 
             for (i, s) in sizes.chunks(3).enumerate() {
                 let size = { s }
-                    .read_u24::<LittleEndian>()
+                    .read_u24_le()
                     .expect("Reading from &[u8] can't fail and the chunk is complete");
 
                 let size = size as usize;
@@ -1168,7 +1173,7 @@ impl<R: Read> Vp8Decoder<R> {
     }
 
     fn read_frame_header(&mut self) -> Result<(), DecodingError> {
-        let tag = self.r.read_u24::<LittleEndian>()?;
+        let tag = self.r.read_u24_le()?;
 
         self.frame.keyframe = tag & 1 == 0;
         self.frame.version = ((tag >> 1) & 7) as u8;
@@ -1184,8 +1189,8 @@ impl<R: Read> Vp8Decoder<R> {
                 return Err(DecodingError::Vp8MagicInvalid(tag));
             }
 
-            let w = self.r.read_u16::<LittleEndian>()?;
-            let h = self.r.read_u16::<LittleEndian>()?;
+            let w = self.r.read_u16_le()?;
+            let h = self.r.read_u16_le()?;
 
             self.frame.width = w & 0x3FFF;
             self.frame.height = h & 0x3FFF;

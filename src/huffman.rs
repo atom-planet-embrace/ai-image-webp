@@ -1,7 +1,9 @@
 //! Rudimentary utility for reading Canonical Huffman Codes.
 //! Based off <https://github.com/webmproject/libwebp/blob/7f8472a610b61ec780ef0a8873cd954ac512a505/src/utils/huffman.c>
 
-use std::io::BufRead;
+use alloc::vec;
+use alloc::vec::Vec;
+use no_std_io::io::BufRead;
 
 use crate::decoder::DecodingError;
 

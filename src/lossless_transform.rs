@@ -1,4 +1,6 @@
-use std::ops::Range;
+use alloc::vec;
+use alloc::vec::Vec;
+use core::ops::Range;
 
 use crate::decoder::DecodingError;
 
@@ -613,7 +615,7 @@ mod benches {
     use rand::Rng;
     use test::{black_box, Bencher};
 
-    fn measure_predictor(b: &mut Bencher, predictor: fn(&mut [u8], std::ops::Range<usize>, usize)) {
+    fn measure_predictor(b: &mut Bencher, predictor: fn(&mut [u8], core::ops::Range<usize>, usize)) {
         let width = 256;
         let mut data = vec![0u8; width * 8];
         rand::thread_rng().fill(&mut data[..]);

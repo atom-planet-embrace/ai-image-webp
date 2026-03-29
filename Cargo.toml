@@ -13,8 +13,8 @@ categories = ["multimedia::images", "multimedia::encoding", "encoding"]
 include = ["/src", "LICENSE-APACHE", "LICENSE-MIT", "README.md"]
 
 [dependencies]
-byteorder-lite = "0.1.0"
-quick-error = "2.0.1"
+no_std_io = { version = "0.6", default-features = false, features = ["alloc"] }
+hashbrown = "0.15"
 
 [dev-dependencies]
 paste = "1.0.14"
@@ -23,4 +23,5 @@ rand = "0.8.5"
 webp = "0.3.0"
 
 [features]
+std = ["no_std_io/std"]
 _benchmarks = []

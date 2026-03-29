@@ -1,9 +1,10 @@
 //! Encoding of WebP images.
-use std::collections::BinaryHeap;
-use std::io::{self, Write};
-use std::slice::ChunksExact;
+use alloc::collections::BinaryHeap;
+use alloc::vec::Vec;
+use no_std_io::io::{self, Write};
+use core::slice::ChunksExact;
 
-use quick_error::quick_error;
+use core::fmt;
 
 /// Color type of the image.
 ///
@@ -22,22 +23,31 @@ pub enum ColorType {
     Rgba8,
 }
 
-quick_error! {
-    /// Error that can occur during encoding.
-    #[derive(Debug)]
-    #[non_exhaustive]
-    pub enum EncodingError {
-        /// An IO error occurred.
-        IoError(err: io::Error) {
-            from()
-            display("IO error: {}", err)
-            source(err)
-        }
+/// Error that can occur during encoding.
+#[derive(Debug)]
+#[non_exhaustive]
+pub enum EncodingError {
+    /// An IO error occurred.
+    IoError(io::Error),
 
-        /// The image dimensions are not allowed by the WebP format.
-        InvalidDimensions {
-            display("Invalid dimensions")
+    /// The image dimensions are not allowed by the WebP format.
+    InvalidDimensions,
+}
+
+impl fmt::Display for EncodingError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            EncodingError::IoError(err) => write!(f, "IO error: {}", err),
+            EncodingError::InvalidDimensions => write!(f, "Invalid dimensions"),
         }
+    }
+}
+
+impl core::error::Error for EncodingError {}
+
+impl From<io::Error> for EncodingError {
+    fn from(err: io::Error) -> Self {
+        EncodingError::IoError(err)
     }
 }
 
@@ -108,12 +118,12 @@ fn build_huffman_tree(
     #[derive(Eq, PartialEq, Copy, Clone, Debug)]
     struct Item(u32, u16);
     impl Ord for Item {
-        fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        fn cmp(&self, other: &Self) -> core::cmp::Ordering {
             other.0.cmp(&self.0)
         }
     }
     impl PartialOrd for Item {
-        fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
             Some(self.cmp(other))
         }
     }
@@ -296,7 +306,7 @@ const fn length_to_symbol(len: u16) -> (u16, u8) {
 #[inline(always)]
 fn count_run(
     pixel: &[u8],
-    it: &mut std::iter::Peekable<ChunksExact<u8>>,
+    it: &mut core::iter::Peekable<ChunksExact<u8>>,
     frequencies1: &mut [u32; 280],
 ) {
     let mut run_length = 0;
@@ -319,7 +329,7 @@ fn count_run(
 fn write_run<W: Write>(
     w: &mut BitWriter<W>,
     pixel: &[u8],
-    it: &mut std::iter::Peekable<ChunksExact<u8>>,
+    it: &mut core::iter::Peekable<ChunksExact<u8>>,
     codes1: &[u16; 280],
     lengths1: &[u8; 280],
 ) -> io::Result<()> {
@@ -756,7 +766,7 @@ mod tests {
             .encode(&img, 256, 256, crate::ColorType::Rgba8)
             .unwrap();
 
-        let mut decoder = crate::WebPDecoder::new(std::io::Cursor::new(output)).unwrap();
+        let mut decoder = crate::WebPDecoder::new(no_std_io::io::Cursor::new(output)).unwrap();
         let mut img2 = vec![0; 256 * 256 * 4];
         decoder.read_image(&mut img2).unwrap();
         assert_eq!(img, img2);
@@ -777,7 +787,7 @@ mod tests {
             .encode(&img, 256, 256, crate::ColorType::Rgb8)
             .unwrap();
 
-        let mut decoder = crate::WebPDecoder::new(std::io::Cursor::new(output)).unwrap();
+        let mut decoder = crate::WebPDecoder::new(no_std_io::io::Cursor::new(output)).unwrap();
 
         let mut img2 = vec![0; 256 * 256 * 3];
         decoder.read_image(&mut img2).unwrap();

@@ -2,8 +2,10 @@
 //!
 //! [Lossless spec](https://developers.google.com/speed/webp/docs/webp_lossless_bitstream_specification)
 
-use std::io::BufRead;
-use std::mem;
+use alloc::vec;
+use alloc::vec::Vec;
+use no_std_io::io::BufRead;
+use core::mem;
 
 use crate::decoder::DecodingError;
 use crate::lossless_transform::{
@@ -797,7 +799,7 @@ impl<R: BufRead> BitReader<R> {
 #[cfg(test)]
 mod test {
 
-    use std::io::Cursor;
+    use no_std_io::io::Cursor;
 
     use super::BitReader;
 

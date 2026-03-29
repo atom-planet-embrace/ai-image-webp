@@ -1,169 +1,156 @@
-use byteorder_lite::{LittleEndian, ReadBytesExt};
-use quick_error::quick_error;
+use alloc::borrow::ToOwned;
+use alloc::string::String;
+use alloc::vec;
+use alloc::vec::Vec;
+use hashbrown::HashMap;
+use no_std_io::io::{self, BufRead, Cursor, Read, Seek, SeekFrom};
+use core::fmt;
+use core::num::NonZeroU16;
+use core::ops::Range;
 
-use std::collections::HashMap;
-use std::io::{self, BufRead, Cursor, Read, Seek};
-use std::num::NonZeroU16;
-use std::ops::Range;
+use crate::byteorder_ext::ReadBytesExt;
 
 use crate::extended::{self, get_alpha_predictor, read_alpha_chunk, WebPExtendedInfo};
 
 use super::lossless::LosslessDecoder;
 use super::vp8::Vp8Decoder;
 
-quick_error! {
-    /// Errors that can occur when attempting to decode a WebP image
-    #[derive(Debug)]
-    #[non_exhaustive]
-    pub enum DecodingError {
-        /// An IO error occurred while reading the file
-        IoError(err: io::Error) {
-            from()
-            display("IO Error: {}", err)
-            source(err)
-        }
+/// Errors that can occur when attempting to decode a WebP image
+#[derive(Debug)]
+#[non_exhaustive]
+pub enum DecodingError {
+    /// An IO error occurred while reading the file
+    IoError(io::Error),
 
-        /// RIFF's "RIFF" signature not found or invalid
-        RiffSignatureInvalid(err: [u8; 4]) {
-            display("Invalid RIFF signature: {err:x?}")
-        }
+    /// RIFF's "RIFF" signature not found or invalid
+    RiffSignatureInvalid([u8; 4]),
 
-        /// WebP's "WEBP" signature not found or invalid
-        WebpSignatureInvalid(err: [u8; 4]) {
-            display("Invalid WebP signature: {err:x?}")
-        }
+    /// WebP's "WEBP" signature not found or invalid
+    WebpSignatureInvalid([u8; 4]),
 
-        /// An expected chunk was missing
-        ChunkMissing {
-            display("An expected chunk was missing")
-        }
+    /// An expected chunk was missing
+    ChunkMissing,
 
-        /// Chunk Header was incorrect or invalid in its usage
-        ChunkHeaderInvalid(err: [u8; 4]) {
-            display("Invalid Chunk header: {err:x?}")
-        }
+    /// Chunk Header was incorrect or invalid in its usage
+    ChunkHeaderInvalid([u8; 4]),
 
-        #[allow(deprecated)]
-        #[deprecated]
-        /// Some bits were invalid
-        ReservedBitSet {
-            display("Reserved bits set")
-        }
+    #[allow(deprecated)]
+    #[deprecated]
+    /// Some bits were invalid
+    ReservedBitSet,
 
-        /// The ALPH chunk preprocessing info flag was invalid
-        InvalidAlphaPreprocessing {
-            display("Alpha chunk preprocessing flag invalid")
-        }
+    /// The ALPH chunk preprocessing info flag was invalid
+    InvalidAlphaPreprocessing,
 
-        /// Invalid compression method
-        InvalidCompressionMethod {
-            display("Invalid compression method")
-        }
+    /// Invalid compression method
+    InvalidCompressionMethod,
 
-        /// Alpha chunk doesn't match the frame's size
-        AlphaChunkSizeMismatch {
-            display("Alpha chunk size mismatch")
-        }
+    /// Alpha chunk doesn't match the frame's size
+    AlphaChunkSizeMismatch,
 
-        /// Image is too large, either for the platform's pointer size or generally
-        ImageTooLarge {
-            display("Image too large")
-        }
+    /// Image is too large, either for the platform's pointer size or generally
+    ImageTooLarge,
 
-        /// Frame would go out of the canvas
-        FrameOutsideImage {
-            display("Frame outside image")
-        }
+    /// Frame would go out of the canvas
+    FrameOutsideImage,
 
-        /// Signature of 0x2f not found
-        LosslessSignatureInvalid(err: u8) {
-            display("Invalid lossless signature: {err:x?}")
-        }
+    /// Signature of 0x2f not found
+    LosslessSignatureInvalid(u8),
 
-        /// Version Number was not zero
-        VersionNumberInvalid(err: u8) {
-            display("Invalid lossless version number: {err}")
-        }
+    /// Version Number was not zero
+    VersionNumberInvalid(u8),
 
-        /// Invalid color cache bits
-        InvalidColorCacheBits(err: u8) {
-            display("Invalid color cache bits: {err}")
-        }
+    /// Invalid color cache bits
+    InvalidColorCacheBits(u8),
 
-        /// An invalid Huffman code was encountered
-        HuffmanError {
-            display("Invalid Huffman code")
-        }
+    /// An invalid Huffman code was encountered
+    HuffmanError,
 
-        /// The bitstream was somehow corrupt
-        BitStreamError {
-            display("Corrupt bitstream")
-        }
+    /// The bitstream was somehow corrupt
+    BitStreamError,
 
-        /// The transforms specified were invalid
-        TransformError {
-            display("Invalid transform")
-        }
+    /// The transforms specified were invalid
+    TransformError,
 
-        /// VP8's `[0x9D, 0x01, 0x2A]` magic not found or invalid
-        Vp8MagicInvalid(err: [u8; 3]) {
-            display("Invalid VP8 magic: {err:x?}")
-        }
+    /// VP8's `[0x9D, 0x01, 0x2A]` magic not found or invalid
+    Vp8MagicInvalid([u8; 3]),
 
-        /// VP8 Decoder initialisation wasn't provided with enough data
-        NotEnoughInitData {
-            display("Not enough VP8 init data")
-        }
+    /// VP8 Decoder initialisation wasn't provided with enough data
+    NotEnoughInitData,
 
-        /// At time of writing, only the YUV colour-space encoded as `0` is specified
-        ColorSpaceInvalid(err: u8) {
-            display("Invalid VP8 color space: {err}")
-        }
+    /// At time of writing, only the YUV colour-space encoded as `0` is specified
+    ColorSpaceInvalid(u8),
 
-        /// LUMA prediction mode was not recognised
-        LumaPredictionModeInvalid(err: i8) {
-            display("Invalid VP8 luma prediction mode: {err}")
-        }
+    /// LUMA prediction mode was not recognised
+    LumaPredictionModeInvalid(i8),
 
-        /// Intra-prediction mode was not recognised
-        IntraPredictionModeInvalid(err: i8) {
-            display("Invalid VP8 intra prediction mode: {err}")
-        }
+    /// Intra-prediction mode was not recognised
+    IntraPredictionModeInvalid(i8),
 
-        /// Chroma prediction mode was not recognised
-        ChromaPredictionModeInvalid(err: i8) {
-            display("Invalid VP8 chroma prediction mode: {err}")
-        }
+    /// Chroma prediction mode was not recognised
+    ChromaPredictionModeInvalid(i8),
 
-        /// Inconsistent image sizes
-        InconsistentImageSizes {
-            display("Inconsistent image sizes")
-        }
+    /// Inconsistent image sizes
+    InconsistentImageSizes,
 
-        /// The file may be valid, but this crate doesn't support decoding it.
-        UnsupportedFeature(err: String) {
-            display("Unsupported feature: {err}")
-        }
+    /// The file may be valid, but this crate doesn't support decoding it.
+    UnsupportedFeature(String),
 
-        /// Invalid function call or parameter
-        InvalidParameter(err: String) {
-            display("Invalid parameter: {err}")
-        }
+    /// Invalid function call or parameter
+    InvalidParameter(String),
 
-        /// Memory limit exceeded
-        MemoryLimitExceeded {
-            display("Memory limit exceeded")
-        }
+    /// Memory limit exceeded
+    MemoryLimitExceeded,
 
-        /// Invalid chunk size
-        InvalidChunkSize {
-            display("Invalid chunk size")
-        }
+    /// Invalid chunk size
+    InvalidChunkSize,
 
-        /// No more frames in image
-        NoMoreFrames {
-            display("No more frames")
+    /// No more frames in image
+    NoMoreFrames,
+}
+
+impl fmt::Display for DecodingError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            DecodingError::IoError(err) => write!(f, "IO Error: {}", err),
+            DecodingError::RiffSignatureInvalid(err) => write!(f, "Invalid RIFF signature: {err:x?}"),
+            DecodingError::WebpSignatureInvalid(err) => write!(f, "Invalid WebP signature: {err:x?}"),
+            DecodingError::ChunkMissing => write!(f, "An expected chunk was missing"),
+            DecodingError::ChunkHeaderInvalid(err) => write!(f, "Invalid Chunk header: {err:x?}"),
+            #[allow(deprecated)]
+            DecodingError::ReservedBitSet => write!(f, "Reserved bits set"),
+            DecodingError::InvalidAlphaPreprocessing => write!(f, "Alpha chunk preprocessing flag invalid"),
+            DecodingError::InvalidCompressionMethod => write!(f, "Invalid compression method"),
+            DecodingError::AlphaChunkSizeMismatch => write!(f, "Alpha chunk size mismatch"),
+            DecodingError::ImageTooLarge => write!(f, "Image too large"),
+            DecodingError::FrameOutsideImage => write!(f, "Frame outside image"),
+            DecodingError::LosslessSignatureInvalid(err) => write!(f, "Invalid lossless signature: {err:x?}"),
+            DecodingError::VersionNumberInvalid(err) => write!(f, "Invalid lossless version number: {err}"),
+            DecodingError::InvalidColorCacheBits(err) => write!(f, "Invalid color cache bits: {err}"),
+            DecodingError::HuffmanError => write!(f, "Invalid Huffman code"),
+            DecodingError::BitStreamError => write!(f, "Corrupt bitstream"),
+            DecodingError::TransformError => write!(f, "Invalid transform"),
+            DecodingError::Vp8MagicInvalid(err) => write!(f, "Invalid VP8 magic: {err:x?}"),
+            DecodingError::NotEnoughInitData => write!(f, "Not enough VP8 init data"),
+            DecodingError::ColorSpaceInvalid(err) => write!(f, "Invalid VP8 color space: {err}"),
+            DecodingError::LumaPredictionModeInvalid(err) => write!(f, "Invalid VP8 luma prediction mode: {err}"),
+            DecodingError::IntraPredictionModeInvalid(err) => write!(f, "Invalid VP8 intra prediction mode: {err}"),
+            DecodingError::ChromaPredictionModeInvalid(err) => write!(f, "Invalid VP8 chroma prediction mode: {err}"),
+            DecodingError::InconsistentImageSizes => write!(f, "Inconsistent image sizes"),
+            DecodingError::UnsupportedFeature(err) => write!(f, "Unsupported feature: {err}"),
+            DecodingError::InvalidParameter(err) => write!(f, "Invalid parameter: {err}"),
+            DecodingError::MemoryLimitExceeded => write!(f, "Memory limit exceeded"),
+            DecodingError::InvalidChunkSize => write!(f, "Invalid chunk size"),
+            DecodingError::NoMoreFrames => write!(f, "No more frames"),
         }
+    }
+}
+
+impl core::error::Error for DecodingError {}
+
+impl From<io::Error> for DecodingError {
+    fn from(err: io::Error) -> Self {
+        DecodingError::IoError(err)
     }
 }
 
@@ -373,11 +360,11 @@ impl<R: BufRead + Seek> WebPDecoder<R> {
         }
 
         let (chunk, chunk_size, chunk_size_rounded) = read_chunk_header(&mut self.r)?;
-        let start = self.r.stream_position()?;
+        let start = self.r.seek(SeekFrom::Current(0))?;
 
         match chunk {
             WebPRiffChunk::VP8 => {
-                let tag = self.r.read_u24::<LittleEndian>()?;
+                let tag = self.r.read_u24_le()?;
 
                 let keyframe = tag & 1 == 0;
                 if !keyframe {
@@ -392,8 +379,8 @@ impl<R: BufRead + Seek> WebPDecoder<R> {
                     return Err(DecodingError::Vp8MagicInvalid(tag));
                 }
 
-                let w = self.r.read_u16::<LittleEndian>()?;
-                let h = self.r.read_u16::<LittleEndian>()?;
+                let w = self.r.read_u16_le()?;
+                let h = self.r.read_u16_le()?;
 
                 self.width = u32::from(w & 0x3FFF);
                 self.height = u32::from(h & 0x3FFF);
@@ -412,7 +399,7 @@ impl<R: BufRead + Seek> WebPDecoder<R> {
                     return Err(DecodingError::LosslessSignatureInvalid(signature));
                 }
 
-                let header = self.r.read_u32::<LittleEndian>()?;
+                let header = self.r.read_u32_le()?;
                 let version = header >> 29;
                 if version != 0 {
                     return Err(DecodingError::VersionNumberInvalid(version as u8));
@@ -432,7 +419,7 @@ impl<R: BufRead + Seek> WebPDecoder<R> {
 
                 let mut position = start + chunk_size_rounded;
                 let max_position = position + riff_size.saturating_sub(12);
-                self.r.seek(io::SeekFrom::Start(position))?;
+                self.r.seek(SeekFrom::Start(position))?;
 
                 while position < max_position {
                     match read_chunk_header(&mut self.r) {
@@ -450,8 +437,8 @@ impl<R: BufRead + Seek> WebPDecoder<R> {
                                     return Err(DecodingError::InvalidChunkSize);
                                 }
 
-                                self.r.seek_relative(12)?;
-                                let duration = self.r.read_u32::<LittleEndian>()? & 0xffffff;
+                                self.r.seek(SeekFrom::Current(12))?; let _ = ();
+                                let duration = self.r.read_u32_le()? & 0xffffff;
                                 self.loop_duration =
                                     self.loop_duration.wrapping_add(u64::from(duration));
 
@@ -465,15 +452,15 @@ impl<R: BufRead + Seek> WebPDecoder<R> {
                                     if let WebPRiffChunk::VP8 | WebPRiffChunk::ALPH = subchunk {
                                         self.is_lossy = true;
                                     }
-                                    self.r.seek_relative(chunk_size_rounded as i64 - 24)?;
+                                    self.r.seek(SeekFrom::Current(chunk_size_rounded as i64 - 24))?; let _ = ();
                                 } else {
-                                    self.r.seek_relative(chunk_size_rounded as i64 - 16)?;
+                                    self.r.seek(SeekFrom::Current(chunk_size_rounded as i64 - 16))?; let _ = ();
                                 }
 
                                 continue;
                             }
 
-                            self.r.seek_relative(chunk_size_rounded as i64)?;
+                            self.r.seek(SeekFrom::Current(chunk_size_rounded as i64))?; let _ = ();
                         }
                         Err(DecodingError::IoError(e))
                             if e.kind() == io::ErrorKind::UnexpectedEof =>
@@ -505,7 +492,7 @@ impl<R: BufRead + Seek> WebPDecoder<R> {
                         Ok(Some(chunk)) => {
                             let mut cursor = Cursor::new(chunk);
                             cursor.read_exact(&mut info.background_color_hint)?;
-                            self.loop_count = match cursor.read_u16::<LittleEndian>()? {
+                            self.loop_count = match cursor.read_u16_le()? {
                                 0 => LoopCount::Forever,
                                 n => LoopCount::Times(NonZeroU16::new(n).unwrap()),
                             };
@@ -525,7 +512,7 @@ impl<R: BufRead + Seek> WebPDecoder<R> {
                 // hashmap so that we can read them later.
                 if let Some(range) = self.chunks.get(&WebPRiffChunk::ANMF).cloned() {
                     let mut position = range.start + 16;
-                    self.r.seek(io::SeekFrom::Start(position))?;
+                    self.r.seek(SeekFrom::Start(position))?;
                     for _ in 0..2 {
                         let (subchunk, subchunk_size, subchunk_size_rounded) =
                             read_chunk_header(&mut self.r)?;
@@ -630,7 +617,7 @@ impl<R: BufRead + Seek> WebPDecoder<R> {
                     return Err(DecodingError::MemoryLimitExceeded);
                 }
 
-                self.r.seek(io::SeekFrom::Start(range.start))?;
+                self.r.seek(SeekFrom::Start(range.start))?;
                 let mut data = vec![0; (range.end - range.start) as usize];
                 self.r.read_exact(&mut data)?;
                 Ok(Some(data))
@@ -672,7 +659,7 @@ impl<R: BufRead + Seek> WebPDecoder<R> {
         }
 
         if self.is_animated() {
-            let saved = std::mem::take(&mut self.animation);
+            let saved = core::mem::take(&mut self.animation);
             self.animation.next_frame_start =
                 self.chunks.get(&WebPRiffChunk::ANMF).unwrap().start - 8;
             let result = self.read_frame(buf);
@@ -762,7 +749,7 @@ impl<R: BufRead + Seek> WebPDecoder<R> {
         };
 
         self.r
-            .seek(io::SeekFrom::Start(self.animation.next_frame_start))?;
+            .seek(SeekFrom::Start(self.animation.next_frame_start))?;
 
         let anmf_size = match read_chunk_header(&mut self.r)? {
             (WebPRiffChunk::ANMF, size, _) if size >= 32 => size,
@@ -823,13 +810,13 @@ impl<R: BufRead + Seek> WebPDecoder<R> {
                 }
 
                 // read alpha
-                let next_chunk_start = self.r.stream_position()? + chunk_size_rounded;
+                let next_chunk_start = self.r.seek(SeekFrom::Current(0))? + chunk_size_rounded;
                 let mut reader = (&mut self.r).take(chunk_size);
                 let alpha_chunk =
                     read_alpha_chunk(&mut reader, frame_width as u16, frame_height as u16)?;
 
                 // read opaque
-                self.r.seek(io::SeekFrom::Start(next_chunk_start))?;
+                self.r.seek(SeekFrom::Start(next_chunk_start))?;
                 let (next_chunk, next_chunk_size, _) = read_chunk_header(&mut self.r)?;
                 if chunk_size + next_chunk_size + 32 > anmf_size {
                     return Err(DecodingError::ChunkHeaderInvalid(next_chunk.to_fourcc()));
@@ -940,7 +927,7 @@ pub(crate) fn range_reader<R: BufRead + Seek>(
     mut r: R,
     range: Range<u64>,
 ) -> Result<impl BufRead, DecodingError> {
-    r.seek(io::SeekFrom::Start(range.start))?;
+    r.seek(SeekFrom::Start(range.start))?;
     Ok(r.take(range.end - range.start))
 }
 
@@ -954,7 +941,7 @@ pub(crate) fn read_chunk_header<R: BufRead>(
     mut r: R,
 ) -> Result<(WebPRiffChunk, u64, u64), DecodingError> {
     let chunk = read_fourcc(&mut r)?;
-    let chunk_size = r.read_u32::<LittleEndian>()?;
+    let chunk_size = r.read_u32_le()?;
     let chunk_size_rounded = chunk_size.saturating_add(chunk_size & 1);
     Ok((chunk, chunk_size.into(), chunk_size_rounded.into()))
 }
@@ -975,7 +962,7 @@ mod tests {
             0x49, 0x54, 0x55, 0x50, 0x4c, 0x54, 0x59, 0x50, 0x45, 0x33, 0x37, 0x44, 0x4d, 0x46,
         ];
 
-        let data = std::io::Cursor::new(bytes);
+        let data = no_std_io::io::Cursor::new(bytes);
 
         let _ = WebPDecoder::new(data);
     }
@@ -997,7 +984,7 @@ mod tests {
         ];
 
         let mut data = [0; NUM_PIXELS];
-        let mut decoder = WebPDecoder::new(std::io::Cursor::new(bytes)).unwrap();
+        let mut decoder = WebPDecoder::new(no_std_io::io::Cursor::new(bytes)).unwrap();
         decoder.read_image(&mut data).unwrap();
 
         // All pixels are the same value
@@ -1020,7 +1007,7 @@ mod tests {
         ];
 
         let mut data = [0; NUM_PIXELS];
-        let mut decoder = WebPDecoder::new(std::io::Cursor::new(bytes)).unwrap();
+        let mut decoder = WebPDecoder::new(no_std_io::io::Cursor::new(bytes)).unwrap();
         decoder.read_image(&mut data).unwrap();
 
         // All pixels are the same value
