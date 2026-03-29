@@ -3,7 +3,7 @@ name = "ai-image-webp"
 version = "0.2.4"
 edition = "2021"
 license = "MIT OR Apache-2.0"
-rust-version = "1.80.1"
+rust-version = "1.81.0"
 
 description = "A no_std fork of image-webp"
 homepage = "https://github.com/atom-planet-embrace/ai-image-webp"
