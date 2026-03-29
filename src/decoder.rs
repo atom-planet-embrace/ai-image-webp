@@ -4,153 +4,169 @@ use alloc::vec;
 use alloc::vec::Vec;
 use hashbrown::HashMap;
 use no_std_io::io::{self, BufRead, Cursor, Read, Seek, SeekFrom};
-use core::fmt;
 use core::num::NonZeroU16;
 use core::ops::Range;
 
 use byteorder_lite::{LittleEndian, ReadBytesExt};
+use quick_error::ai_quick_error;
 
 use crate::extended::{self, get_alpha_predictor, read_alpha_chunk, WebPExtendedInfo};
 
 use super::lossless::LosslessDecoder;
 use super::vp8::Vp8Decoder;
 
-/// Errors that can occur when attempting to decode a WebP image
-#[derive(Debug)]
-#[non_exhaustive]
-pub enum DecodingError {
-    /// An IO error occurred while reading the file
-    IoError(io::Error),
-
-    /// RIFF's "RIFF" signature not found or invalid
-    RiffSignatureInvalid([u8; 4]),
-
-    /// WebP's "WEBP" signature not found or invalid
-    WebpSignatureInvalid([u8; 4]),
-
-    /// An expected chunk was missing
-    ChunkMissing,
-
-    /// Chunk Header was incorrect or invalid in its usage
-    ChunkHeaderInvalid([u8; 4]),
-
-    #[allow(deprecated)]
-    #[deprecated]
-    /// Some bits were invalid
-    ReservedBitSet,
-
-    /// The ALPH chunk preprocessing info flag was invalid
-    InvalidAlphaPreprocessing,
-
-    /// Invalid compression method
-    InvalidCompressionMethod,
-
-    /// Alpha chunk doesn't match the frame's size
-    AlphaChunkSizeMismatch,
-
-    /// Image is too large, either for the platform's pointer size or generally
-    ImageTooLarge,
-
-    /// Frame would go out of the canvas
-    FrameOutsideImage,
-
-    /// Signature of 0x2f not found
-    LosslessSignatureInvalid(u8),
-
-    /// Version Number was not zero
-    VersionNumberInvalid(u8),
-
-    /// Invalid color cache bits
-    InvalidColorCacheBits(u8),
-
-    /// An invalid Huffman code was encountered
-    HuffmanError,
-
-    /// The bitstream was somehow corrupt
-    BitStreamError,
-
-    /// The transforms specified were invalid
-    TransformError,
-
-    /// VP8's `[0x9D, 0x01, 0x2A]` magic not found or invalid
-    Vp8MagicInvalid([u8; 3]),
-
-    /// VP8 Decoder initialisation wasn't provided with enough data
-    NotEnoughInitData,
-
-    /// At time of writing, only the YUV colour-space encoded as `0` is specified
-    ColorSpaceInvalid(u8),
-
-    /// LUMA prediction mode was not recognised
-    LumaPredictionModeInvalid(i8),
-
-    /// Intra-prediction mode was not recognised
-    IntraPredictionModeInvalid(i8),
-
-    /// Chroma prediction mode was not recognised
-    ChromaPredictionModeInvalid(i8),
-
-    /// Inconsistent image sizes
-    InconsistentImageSizes,
-
-    /// The file may be valid, but this crate doesn't support decoding it.
-    UnsupportedFeature(String),
-
-    /// Invalid function call or parameter
-    InvalidParameter(String),
-
-    /// Memory limit exceeded
-    MemoryLimitExceeded,
-
-    /// Invalid chunk size
-    InvalidChunkSize,
-
-    /// No more frames in image
-    NoMoreFrames,
-}
-
-impl fmt::Display for DecodingError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            DecodingError::IoError(err) => write!(f, "IO Error: {}", err),
-            DecodingError::RiffSignatureInvalid(err) => write!(f, "Invalid RIFF signature: {err:x?}"),
-            DecodingError::WebpSignatureInvalid(err) => write!(f, "Invalid WebP signature: {err:x?}"),
-            DecodingError::ChunkMissing => write!(f, "An expected chunk was missing"),
-            DecodingError::ChunkHeaderInvalid(err) => write!(f, "Invalid Chunk header: {err:x?}"),
-            #[allow(deprecated)]
-            DecodingError::ReservedBitSet => write!(f, "Reserved bits set"),
-            DecodingError::InvalidAlphaPreprocessing => write!(f, "Alpha chunk preprocessing flag invalid"),
-            DecodingError::InvalidCompressionMethod => write!(f, "Invalid compression method"),
-            DecodingError::AlphaChunkSizeMismatch => write!(f, "Alpha chunk size mismatch"),
-            DecodingError::ImageTooLarge => write!(f, "Image too large"),
-            DecodingError::FrameOutsideImage => write!(f, "Frame outside image"),
-            DecodingError::LosslessSignatureInvalid(err) => write!(f, "Invalid lossless signature: {err:x?}"),
-            DecodingError::VersionNumberInvalid(err) => write!(f, "Invalid lossless version number: {err}"),
-            DecodingError::InvalidColorCacheBits(err) => write!(f, "Invalid color cache bits: {err}"),
-            DecodingError::HuffmanError => write!(f, "Invalid Huffman code"),
-            DecodingError::BitStreamError => write!(f, "Corrupt bitstream"),
-            DecodingError::TransformError => write!(f, "Invalid transform"),
-            DecodingError::Vp8MagicInvalid(err) => write!(f, "Invalid VP8 magic: {err:x?}"),
-            DecodingError::NotEnoughInitData => write!(f, "Not enough VP8 init data"),
-            DecodingError::ColorSpaceInvalid(err) => write!(f, "Invalid VP8 color space: {err}"),
-            DecodingError::LumaPredictionModeInvalid(err) => write!(f, "Invalid VP8 luma prediction mode: {err}"),
-            DecodingError::IntraPredictionModeInvalid(err) => write!(f, "Invalid VP8 intra prediction mode: {err}"),
-            DecodingError::ChromaPredictionModeInvalid(err) => write!(f, "Invalid VP8 chroma prediction mode: {err}"),
-            DecodingError::InconsistentImageSizes => write!(f, "Inconsistent image sizes"),
-            DecodingError::UnsupportedFeature(err) => write!(f, "Unsupported feature: {err}"),
-            DecodingError::InvalidParameter(err) => write!(f, "Invalid parameter: {err}"),
-            DecodingError::MemoryLimitExceeded => write!(f, "Memory limit exceeded"),
-            DecodingError::InvalidChunkSize => write!(f, "Invalid chunk size"),
-            DecodingError::NoMoreFrames => write!(f, "No more frames"),
+ai_quick_error! {
+    /// Errors that can occur when attempting to decode a WebP image
+    #[derive(Debug)]
+    #[non_exhaustive]
+    pub enum DecodingError {
+        /// An IO error occurred while reading the file
+        IoError(err: no_std_io::io::Error) {
+            from()
+            display("IO Error: {}", err)
         }
-    }
-}
 
-impl core::error::Error for DecodingError {}
+        /// RIFF's "RIFF" signature not found or invalid
+        RiffSignatureInvalid(err: [u8; 4]) {
+            display("Invalid RIFF signature: {err:x?}")
+        }
 
-impl From<io::Error> for DecodingError {
-    fn from(err: io::Error) -> Self {
-        DecodingError::IoError(err)
+        /// WebP's "WEBP" signature not found or invalid
+        WebpSignatureInvalid(err: [u8; 4]) {
+            display("Invalid WebP signature: {err:x?}")
+        }
+
+        /// An expected chunk was missing
+        ChunkMissing {
+            display("An expected chunk was missing")
+        }
+
+        /// Chunk Header was incorrect or invalid in its usage
+        ChunkHeaderInvalid(err: [u8; 4]) {
+            display("Invalid Chunk header: {err:x?}")
+        }
+
+        #[allow(deprecated)]
+        #[deprecated]
+        /// Some bits were invalid
+        ReservedBitSet {
+            display("Reserved bits set")
+        }
+
+        /// The ALPH chunk preprocessing info flag was invalid
+        InvalidAlphaPreprocessing {
+            display("Alpha chunk preprocessing flag invalid")
+        }
+
+        /// Invalid compression method
+        InvalidCompressionMethod {
+            display("Invalid compression method")
+        }
+
+        /// Alpha chunk doesn't match the frame's size
+        AlphaChunkSizeMismatch {
+            display("Alpha chunk size mismatch")
+        }
+
+        /// Image is too large, either for the platform's pointer size or generally
+        ImageTooLarge {
+            display("Image too large")
+        }
+
+        /// Frame would go out of the canvas
+        FrameOutsideImage {
+            display("Frame outside image")
+        }
+
+        /// Signature of 0x2f not found
+        LosslessSignatureInvalid(err: u8) {
+            display("Invalid lossless signature: {err:x?}")
+        }
+
+        /// Version Number was not zero
+        VersionNumberInvalid(err: u8) {
+            display("Invalid lossless version number: {err}")
+        }
+
+        /// Invalid color cache bits
+        InvalidColorCacheBits(err: u8) {
+            display("Invalid color cache bits: {err}")
+        }
+
+        /// An invalid Huffman code was encountered
+        HuffmanError {
+            display("Invalid Huffman code")
+        }
+
+        /// The bitstream was somehow corrupt
+        BitStreamError {
+            display("Corrupt bitstream")
+        }
+
+        /// The transforms specified were invalid
+        TransformError {
+            display("Invalid transform")
+        }
+
+        /// VP8's `[0x9D, 0x01, 0x2A]` magic not found or invalid
+        Vp8MagicInvalid(err: [u8; 3]) {
+            display("Invalid VP8 magic: {err:x?}")
+        }
+
+        /// VP8 Decoder initialisation wasn't provided with enough data
+        NotEnoughInitData {
+            display("Not enough VP8 init data")
+        }
+
+        /// At time of writing, only the YUV colour-space encoded as `0` is specified
+        ColorSpaceInvalid(err: u8) {
+            display("Invalid VP8 color space: {err}")
+        }
+
+        /// LUMA prediction mode was not recognised
+        LumaPredictionModeInvalid(err: i8) {
+            display("Invalid VP8 luma prediction mode: {err}")
+        }
+
+        /// Intra-prediction mode was not recognised
+        IntraPredictionModeInvalid(err: i8) {
+            display("Invalid VP8 intra prediction mode: {err}")
+        }
+
+        /// Chroma prediction mode was not recognised
+        ChromaPredictionModeInvalid(err: i8) {
+            display("Invalid VP8 chroma prediction mode: {err}")
+        }
+
+        /// Inconsistent image sizes
+        InconsistentImageSizes {
+            display("Inconsistent image sizes")
+        }
+
+        /// The file may be valid, but this crate doesn't support decoding it.
+        UnsupportedFeature(err: String) {
+            display("Unsupported feature: {err}")
+        }
+
+        /// Invalid function call or parameter
+        InvalidParameter(err: String) {
+            display("Invalid parameter: {err}")
+        }
+
+        /// Memory limit exceeded
+        MemoryLimitExceeded {
+            display("Memory limit exceeded")
+        }
+
+        /// Invalid chunk size
+        InvalidChunkSize {
+            display("Invalid chunk size")
+        }
+
+        /// No more frames in image
+        NoMoreFrames {
+            display("No more frames")
+        }
     }
 }
 

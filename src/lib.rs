@@ -1,6 +1,7 @@
 //! Decoding and Encoding of WebP Images
 
 #![cfg_attr(not(test), no_std)]
+#![recursion_limit = "256"]
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
 // Enable nightly benchmark functionality if "_benchmarks" feature is enabled.

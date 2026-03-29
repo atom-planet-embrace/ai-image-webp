@@ -4,7 +4,7 @@ use alloc::vec::Vec;
 use no_std_io::io::{self, Write};
 use core::slice::ChunksExact;
 
-use core::fmt;
+use quick_error::ai_quick_error;
 
 /// Color type of the image.
 ///
@@ -23,31 +23,21 @@ pub enum ColorType {
     Rgba8,
 }
 
-/// Error that can occur during encoding.
-#[derive(Debug)]
-#[non_exhaustive]
-pub enum EncodingError {
-    /// An IO error occurred.
-    IoError(io::Error),
-
-    /// The image dimensions are not allowed by the WebP format.
-    InvalidDimensions,
-}
-
-impl fmt::Display for EncodingError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            EncodingError::IoError(err) => write!(f, "IO error: {}", err),
-            EncodingError::InvalidDimensions => write!(f, "Invalid dimensions"),
+ai_quick_error! {
+    /// Error that can occur during encoding.
+    #[derive(Debug)]
+    #[non_exhaustive]
+    pub enum EncodingError {
+        /// An IO error occurred.
+        IoError(err: no_std_io::io::Error) {
+            from()
+            display("IO error: {}", err)
         }
-    }
-}
 
-impl core::error::Error for EncodingError {}
-
-impl From<io::Error> for EncodingError {
-    fn from(err: io::Error) -> Self {
-        EncodingError::IoError(err)
+        /// The image dimensions are not allowed by the WebP format.
+        InvalidDimensions {
+            display("Invalid dimensions")
+        }
     }
 }
 
