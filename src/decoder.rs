@@ -437,7 +437,7 @@ impl<R: BufRead + Seek> WebPDecoder<R> {
                                     return Err(DecodingError::InvalidChunkSize);
                                 }
 
-                                self.r.seek(SeekFrom::Current(12))?; let _ = ();
+                                self.r.seek(SeekFrom::Current(12))?;
                                 let duration = self.r.read_u32::<LittleEndian>()? & 0xffffff;
                                 self.loop_duration =
                                     self.loop_duration.wrapping_add(u64::from(duration));
@@ -452,15 +452,15 @@ impl<R: BufRead + Seek> WebPDecoder<R> {
                                     if let WebPRiffChunk::VP8 | WebPRiffChunk::ALPH = subchunk {
                                         self.is_lossy = true;
                                     }
-                                    self.r.seek(SeekFrom::Current(chunk_size_rounded as i64 - 24))?; let _ = ();
+                                    self.r.seek(SeekFrom::Current(chunk_size_rounded as i64 - 24))?;
                                 } else {
-                                    self.r.seek(SeekFrom::Current(chunk_size_rounded as i64 - 16))?; let _ = ();
+                                    self.r.seek(SeekFrom::Current(chunk_size_rounded as i64 - 16))?;
                                 }
 
                                 continue;
                             }
 
-                            self.r.seek(SeekFrom::Current(chunk_size_rounded as i64))?; let _ = ();
+                            self.r.seek(SeekFrom::Current(chunk_size_rounded as i64))?;
                         }
                         Err(DecodingError::IoError(e))
                             if e.kind() == io::ErrorKind::UnexpectedEof =>
