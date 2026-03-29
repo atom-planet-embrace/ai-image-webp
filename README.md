@@ -36,32 +36,3 @@ decoding.
   task and would require a lot of work. If you are interested in helping with
   this, please get in touch!
 
-## Unsafe code
-
-Both this crate and all of its dependencies currently contain no unsafe code.
-
-NOTE: This isn't a guarantee that unsafe code will never be added. It may prove
-necessary in the future to improve performance, but we will always strive to
-minimize the use of unsafe code and ensure that it is well-tested and
-documented.
-
-```
-$ cargo geiger
-
-Metric output format: x/y
-    x = unsafe code used by the build
-    y = total unsafe code found in the crate
-
-Symbols:
-    🔒  = No `unsafe` usage found, declares #![forbid(unsafe_code)]
-    ❓  = No `unsafe` usage found, missing #![forbid(unsafe_code)]
-    ☢️   = `unsafe` usage found
-
-Functions  Expressions  Impls  Traits  Methods  Dependency
-
-0/0        0/0          0/0    0/0     0/0      🔒 ai-image-webp 0.2.3
-0/0        0/0          0/0    0/0     0/0      🔒 ├── byteorder-lite 0.1.0
-0/0        0/0          0/0    0/0     0/0      ❓ └── quick-error 2.0.1
-
-0/0        0/0          0/0    0/0     0/0
-```
