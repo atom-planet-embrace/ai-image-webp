@@ -1,8 +1,8 @@
+use super::lossless::LosslessDecoder;
+use crate::decoder::DecodingError;
 use alloc::vec;
 use alloc::vec::Vec;
-use super::lossless::LosslessDecoder;
 use byteorder_lite::ReadBytesExt;
-use crate::decoder::DecodingError;
 use no_std_io::io::{BufRead, Read};
 
 use crate::alpha_blending::do_alpha_blending;

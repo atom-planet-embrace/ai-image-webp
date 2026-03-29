@@ -1,8 +1,8 @@
 //! Encoding of WebP images.
 use alloc::collections::BinaryHeap;
 use alloc::vec::Vec;
-use no_std_io::io::{self, Write};
 use core::slice::ChunksExact;
+use no_std_io::io::{self, Write};
 
 use quick_error::ai_quick_error;
 

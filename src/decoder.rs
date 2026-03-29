@@ -2,10 +2,10 @@ use alloc::borrow::ToOwned;
 use alloc::string::String;
 use alloc::vec;
 use alloc::vec::Vec;
-use hashbrown::HashMap;
-use no_std_io::io::{self, BufRead, Cursor, Read, Seek, SeekFrom};
 use core::num::NonZeroU16;
 use core::ops::Range;
+use hashbrown::HashMap;
+use no_std_io::io::{self, BufRead, Cursor, Read, Seek, SeekFrom};
 
 use byteorder_lite::{LittleEndian, ReadBytesExt};
 use quick_error::ai_quick_error;
@@ -470,9 +470,11 @@ impl<R: BufRead + Seek> WebPDecoder<R> {
                                     if let WebPRiffChunk::VP8 | WebPRiffChunk::ALPH = subchunk {
                                         self.is_lossy = true;
                                     }
-                                    self.r.seek(SeekFrom::Current(chunk_size_rounded as i64 - 24))?;
+                                    self.r
+                                        .seek(SeekFrom::Current(chunk_size_rounded as i64 - 24))?;
                                 } else {
-                                    self.r.seek(SeekFrom::Current(chunk_size_rounded as i64 - 16))?;
+                                    self.r
+                                        .seek(SeekFrom::Current(chunk_size_rounded as i64 - 16))?;
                                 }
 
                                 continue;

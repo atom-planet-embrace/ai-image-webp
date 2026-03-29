@@ -4,8 +4,8 @@
 
 use alloc::vec;
 use alloc::vec::Vec;
-use no_std_io::io::BufRead;
 use core::mem;
+use no_std_io::io::BufRead;
 
 use crate::decoder::DecodingError;
 use crate::lossless_transform::{
